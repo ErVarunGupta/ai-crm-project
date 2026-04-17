@@ -5,27 +5,30 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# CORS FIX
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔥 allow all (for dev)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Dummy DB
+database = []
+
+memory = {}
+
 class ChatRequest(BaseModel):
     message: str
-
-# 🔥 simple memory (shared with frontend)
-memory = {}
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
     global memory
 
-    msg = req.message.lower().strip()
+    msg = req.message.lower()
 
-    # 🔥 SUMMARY (direct handling — guaranteed)
+    # SUMMARY
     if "summary" in msg:
         return {
             "message": req.message,
@@ -33,13 +36,19 @@ async def chat(req: ChatRequest):
             "summary": f"Interaction summary: {memory}"
         }
 
-    # 🔥 call LangGraph for extraction/edit
     result = app_graph.invoke({"message": req.message})
 
-    # update memory
     memory = result.get("structured_data", {})
+
+    # SAVE TO DB
+    database.append(memory)
 
     return {
         "message": result.get("message"),
         "structured_data": memory
     }
+
+
+@app.get("/data")
+def get_data():
+    return database
